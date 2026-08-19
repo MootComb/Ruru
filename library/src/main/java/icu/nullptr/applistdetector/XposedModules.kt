@@ -2,7 +2,9 @@ package icu.nullptr.applistdetector
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 
 import java.util.zip.ZipFile
 
@@ -20,39 +22,54 @@ class XposedModules(
         val pm = context.packageManager
         val set = if (detail == null) null else mutableSetOf<Pair<String, Result>>()
 
-        val apps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+        val intent=Intent(Intent.ACTION_MAIN)
+        val apps = pm.queryIntentActivities(intent,PackageManager.GET_META_DATA)
+            .map { it.activityInfo.applicationInfo }
+            .distinctBy { it.packageName }
 
-        val meta: String
-        val meta2: String
-        if (lspatch) {
-            meta = "lspatch"
-            meta2 = "jshook"
-        } else {
-            meta = "xposedminversion"
-            meta2 = "xposeddescription"
-        }
+        val XpmetaList= listOf("xposedminversion", "xposeddescription")
+        val LspmetaList= listOf("lspatch","npatch","jshook")
+        val XposedPatch = listOf("META-INF/xposed/module.prop")
 
         for (pkg in apps) {
+            val meta = pkg.metaData
             val label = pm.getApplicationLabel(pkg) as String
             var found = false
-            if (pkg.metaData?.get(meta) != null || pkg.metaData?.get(meta2) != null) {
-                found = true
-            }
+            var hasxppatch =false
+            var extraTag = ""
+            val hasXpmeta=XpmetaList.any { meta?.containsKey(it) ==true }
+            val hasLspmeta=LspmetaList.any { meta?.containsKey(it) ==true }
+            val getLspmeta=LspmetaList.firstOrNull{ meta?.containsKey(it)==true }
             val apkPath = pkg.sourceDir
             try {
                 ZipFile(apkPath).use { zip ->
-                    if (zip.getEntry("META-INF/xposed/") != null ||
-                        zip.getEntry("META-INF/xposed/module.prop") != null
-                    ) {
-                        found = true
-                    }
+                    hasxppatch=XposedPatch.any { zip.getEntry(it)!=null }
                 }
             } catch (e: Exception) {
             }
-
+            var haslspfact = false
+            if (Build.VERSION.SDK_INT >=Build.VERSION_CODES.P){
+                pkg.appComponentFactory?.let { factory ->
+                    if (factory.contains("lsposed")){
+                        haslspfact = true
+                    }
+                }
+            }
+            if (lspatch){
+                found = hasLspmeta || haslspfact
+                when{
+                    haslspfact -> extraTag ="(Api28)"
+                    getLspmeta !=null -> extraTag= "(${getLspmeta})"
+                }
+            }else{
+                found =(hasXpmeta || hasxppatch) && !hasLspmeta
+                if (hasxppatch){
+                    extraTag="(libxposed 101)"
+                }
+            }
             if (found) {
                 result = Result.FOUND
-                set?.add(label to Result.FOUND)
+                set?.add( label+extraTag to Result.FOUND)
             }
         }
 
