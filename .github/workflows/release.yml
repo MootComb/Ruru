@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: [ "new", "main", "master" ]
+    branches: [ "new" ]
   workflow_dispatch:
 
 jobs:
@@ -23,16 +23,19 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Accept SDK licenses
+    - name: Accept licenses
       run: |
         yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+    - name: Install NDK
+      run: |
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;23.1.7779620"
 
     - name: Create local.properties
       run: |
         echo "sdk.dir=$ANDROID_HOME" > local.properties
-        echo "ndk.dir=$ANDROID_HOME/ndk-bundle" >> local.properties
 
-    - name: Grant execute permission
+    - name: Grant execute
       run: chmod +x gradlew
 
     - name: Build APK
@@ -66,16 +69,19 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Accept SDK licenses
+    - name: Accept licenses
       run: |
         yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+    - name: Install NDK
+      run: |
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;23.1.7779620"
 
     - name: Create local.properties
       run: |
         echo "sdk.dir=$ANDROID_HOME" > local.properties
-        echo "ndk.dir=$ANDROID_HOME/ndk-bundle" >> local.properties
 
-    - name: Grant execute permission
+    - name: Grant execute
       run: chmod +x gradlew
 
     - name: Build APK
